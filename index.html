@@ -536,8 +536,25 @@
             }
         });
 
-        // 进页面就试着播，被拦了就走 hint 提示
-        playMusic();
+        // 进页面就试着播；被浏览器拦了，就等「页面里第一次任意手势」自动起播
+        // （Chrome/Safari 规定：带声音的媒体必须由真实用户手势触发，摄像头授权弹窗不算）
+        playMusic().then(ok => { if (!ok) armFirstGesture(); });
+
+        function armFirstGesture() {
+            const events = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+
+            const disarm = () => events.forEach(ev => window.removeEventListener(ev, handler, true));
+
+            function handler(e) {
+                // 点在音符按钮上就交给按钮自己处理，避免「刚播又被自己暂停」
+                const t = e.target;
+                if (t && t.closest && t.closest('#music-btn')) return;
+                if (!bgm.paused) { disarm(); return; }
+                playMusic().then(ok => { if (ok) disarm(); });
+            }
+
+            events.forEach(ev => window.addEventListener(ev, handler, true));
+        }
 
         // --- 5. MediaPipe ---
         let camReady = false;

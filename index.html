@@ -2,6 +2,8 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#050505">
     <title>手势控制 3D 粒子系统</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23050505'/%3E%3Ctext x='16' y='24' font-size='21' text-anchor='middle' fill='%2300ffff'%3E%E2%99%AA%3C/text%3E%3C/svg%3E">
     <style>
@@ -245,6 +247,114 @@
             filter: drop-shadow(0 0 4px rgba(0, 255, 255, 0.7));
         }
         #music-btn.playing .ring-fg { opacity: 1; }
+
+        /* ---------- 面板标题行 ---------- */
+        #panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+        #panel-toggle {
+            display: none;
+            font-size: 20px;
+            line-height: 1;
+            opacity: 0.6;
+            transition: transform 0.3s;
+        }
+
+        /* ---------- 音乐提示气泡 ---------- */
+        #music-tip {
+            position: absolute;
+            top: 30px;
+            left: 86px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(0, 255, 255, 0.12);
+            border: 1px solid rgba(0, 255, 255, 0.4);
+            color: #7df9ff;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 12;
+            opacity: 0;
+            transform: translateX(-6px);
+            pointer-events: none;
+            transition: opacity 0.35s, transform 0.35s;
+            box-shadow: 0 0 14px rgba(0, 255, 255, 0.25);
+        }
+        #music-tip.show { opacity: 1; transform: translateX(0); }
+
+        /* ================= 手机端适配 ================= */
+        @media (max-width: 760px) {
+            /* 控制面板改成底部抽屉 */
+            #ui-container {
+                top: auto;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                width: auto;
+                max-height: 58vh;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                border-radius: 20px 20px 0 0;
+                padding: 10px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+                border-left: none;
+                border-right: none;
+                border-bottom: none;
+                background: rgba(16, 16, 16, 0.74);
+                box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.6);
+            }
+            #panel-head {
+                cursor: pointer;
+                margin-bottom: 10px;
+                padding: 4px 0;
+            }
+            .panel-title { font-size: 15px; }
+            #panel-toggle { display: block; }
+            #ui-container.collapsed .panel-body { display: none; }
+            #ui-container.collapsed #panel-toggle { transform: rotate(180deg); }
+            #ui-container.collapsed { padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+
+            /* 形态按钮：3 列 2 行，6 个全露出来 */
+            .shape-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+            }
+            .shape-grid button {
+                padding: 10px 4px;
+                font-size: 13px;
+                white-space: nowrap;
+            }
+
+            label { font-size: 13px; margin-bottom: 6px; }
+            .control-group { margin-bottom: 12px; }
+            input[type="color"] { height: 40px; }
+            input[type="range"] { height: 6px; }
+            input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
+            input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
+            #cam-status { font-size: 12px; }
+            #retry-btn { padding: 10px; font-size: 12px; }
+
+            /* 顶部按钮与摄像头预览重新排布 */
+            #music-btn { top: 14px; left: 14px; width: 48px; height: 48px; }
+            #music-btn .note { font-size: 22px; }
+            #music-tip { top: 22px; left: 74px; font-size: 11px; padding: 5px 10px; }
+            #fullscreen-btn { top: 14px; right: 14px; bottom: auto; width: 38px; height: 38px; }
+            #camera-preview {
+                top: 74px;
+                left: 14px;
+                bottom: auto;
+                width: 96px;
+                height: 72px;
+            }
+            #loading { font-size: 15px; max-width: 88vw; }
+        }
     </style>
 </head>
 <body>
@@ -253,8 +363,12 @@
 
     <!-- UI 面板 -->
     <div id="ui-container">
-        <h2>粒子控制器</h2>
+        <div id="panel-head">
+            <span class="panel-title">粒子控制器</span>
+            <span id="panel-toggle" aria-label="收起/展开面板">⌄</span>
+        </div>
 
+        <div class="panel-body">
         <div class="control-group">
             <label>选择模型</label>
             <div class="shape-grid">
@@ -262,7 +376,7 @@
                 <button onclick="setShape('heart')" class="active">❤️ 爱心</button>
                 <button onclick="setShape('flower')">🌸 花朵</button>
                 <button onclick="setShape('saturn')">🪐 土星</button>
-                <button onclick="setShape('buddha')">🧘 佛像(拟)</button>
+                <button onclick="setShape('buddha')">🧘 佛像</button>
                 <button onclick="setShape('firework')">🎆 烟花</button>
                 <button onclick="setShape('sphere')">🔮 球体</button>
             </div>
@@ -291,6 +405,7 @@
             🎵 左上角音符 = 播放 / 暂停音乐<br>
             <span style="color:#666">（摄像头不可用时，拖动上面的滑块控制）</span>
         </div>
+        </div><!-- /panel-body -->
     </div>
 
     <button id="fullscreen-btn" onclick="toggleFullScreen()">⛶</button>
@@ -304,6 +419,7 @@
         </svg>
         <span class="note">♪</span>
     </div>
+    <div id="music-tip">点击开启音乐</div>
     <audio id="bgm" src="music.mp3" loop preload="auto"></audio>
 
     <!-- 引入库文件 -->
@@ -490,6 +606,7 @@
         // --- 4.5 背景音乐（左上角音符按钮） ---
         const bgm = document.getElementById('bgm');
         const musicBtn = document.getElementById('music-btn');
+        const musicTip = document.getElementById('music-tip');
         const ringFg = musicBtn.querySelector('.ring-fg');
         const RING_CIRC = 2 * Math.PI * 25;
 
@@ -497,6 +614,7 @@
             const playing = !bgm.paused && !bgm.ended;
             musicBtn.classList.toggle('playing', playing);
             musicBtn.classList.remove('hint');   // 一旦有状态变化就撤掉提示
+            musicTip.classList.remove('show');
             musicBtn.setAttribute('aria-label', playing ? '暂停音乐' : '播放音乐');
             musicBtn.title = playing ? '暂停音乐' : '播放音乐';
             if (!playing) ringFg.style.strokeDashoffset = String(RING_CIRC);
@@ -507,9 +625,10 @@
                 syncMusicUI();
                 return true;
             }).catch(() => {
-                // 被浏览器自动播放策略拦了：给按钮加呼吸提示，等用户点一下
+                // 被浏览器自动播放策略拦了：按钮呼吸 + 气泡提示，等用户点一下
                 musicBtn.classList.add('hint');
                 musicBtn.classList.remove('playing');
+                musicTip.classList.add('show');
                 return false;
             });
         }
@@ -537,11 +656,24 @@
         });
 
         // 进页面就试着播；被浏览器拦了，就等「页面里第一次任意手势」自动起播
-        // （Chrome/Safari 规定：带声音的媒体必须由真实用户手势触发，摄像头授权弹窗不算）
+        // （Chrome/Safari/微信 都规定：带声音的媒体必须由真实用户手势触发，摄像头授权弹窗不算）
         playMusic().then(ok => { if (!ok) armFirstGesture(); });
 
+        // 微信内置浏览器（X5 内核）：部分版本要等 JSBridge 就绪后才允许出声
+        if (typeof window.WeixinJSBridge === 'undefined') {
+            document.addEventListener('WeixinJSBridgeReady', () => {
+                if (bgm.paused) playMusic();
+            }, false);
+        }
+
+        // 从后台切回来时再试一次（部分手机锁屏/切 App 后会暂停）
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && bgm.paused && !musicBtn.classList.contains('hint')) playMusic();
+        });
+
         function armFirstGesture() {
-            const events = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+            // 微信 X5 内核不一定有 pointerdown，所以把鼠标/触摸事件都挂上
+            const events = ['pointerdown', 'touchstart', 'mousedown', 'touchend', 'click', 'keydown', 'wheel'];
 
             const disarm = () => events.forEach(ev => window.removeEventListener(ev, handler, true));
 
@@ -554,6 +686,18 @@
             }
 
             events.forEach(ev => window.addEventListener(ev, handler, true));
+        }
+
+        // --- 4.6 手机端：点标题栏收起/展开面板 ---
+        const uiContainer = document.getElementById('ui-container');
+        document.getElementById('panel-head').addEventListener('click', () => {
+            if (window.matchMedia('(max-width: 760px)').matches) {
+                uiContainer.classList.toggle('collapsed');
+            }
+        });
+        // 手机上一进来先收起，让作品占满屏；想看控件点一下底栏
+        if (window.matchMedia('(max-width: 760px)').matches) {
+            uiContainer.classList.add('collapsed');
         }
 
         // --- 5. MediaPipe ---
@@ -732,7 +876,7 @@
 
             particles.geometry.attributes.position.needsUpdate = true;
             particles.scale.setScalar(handScaleFactor);
-            particles.rotation.y += 0.002;
+            particles.rotation.y = Math.sin(time * 0.22) * 0.42;   // 左右轻摆，不再整圈旋转（否则爱心会转到侧面变成一条竖线）
             particles.rotation.z = Math.sin(time * 0.5) * 0.05;
 
             if (handScaleFactor > 1.5) {

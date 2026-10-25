@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>手势控制 3D 粒子系统</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23050505'/%3E%3Ctext x='16' y='24' font-size='21' text-anchor='middle' fill='%2300ffff'%3E%E2%99%AA%3C/text%3E%3C/svg%3E">
     <style>
         body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Segoe UI', sans-serif; }
 
@@ -158,6 +159,92 @@
             color: #7dffd8;
         }
         #retry-btn { margin-top: 8px; width: 100%; font-size: 11px; }
+
+        /* 左上角音乐按钮 */
+        #music-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 12;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            transition: border-color 0.35s, box-shadow 0.35s, transform 0.15s;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        #music-btn:active { transform: scale(0.94); }
+
+        #music-btn .note {
+            font-size: 26px;
+            line-height: 1;
+            color: #8a8a8a;
+            transition: color 0.35s, text-shadow 0.35s;
+            transform: translateY(-1px);
+            pointer-events: none;
+        }
+
+        /* 播放中：青色发光 + 音符轻轻摆动 */
+        #music-btn.playing {
+            border-color: rgba(0, 255, 255, 0.55);
+            box-shadow: 0 0 18px rgba(0, 255, 255, 0.35), 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+        #music-btn.playing .note {
+            color: #00ffff;
+            text-shadow: 0 0 12px rgba(0, 255, 255, 0.9);
+            animation: noteBeat 1.8s ease-in-out infinite;
+        }
+        @keyframes noteBeat {
+            0%, 100% { transform: translateY(-1px) rotate(-5deg) scale(1); }
+            50%      { transform: translateY(-3px) rotate(5deg) scale(1.09); }
+        }
+
+        /* 自动播放被拦截时，轻轻提示用户点一下 */
+        #music-btn.hint {
+            border-color: rgba(0, 255, 255, 0.45);
+            animation: hintPulse 2.2s ease-in-out infinite;
+        }
+        #music-btn.hint .note { color: rgba(0, 255, 255, 0.85); text-shadow: 0 0 10px rgba(0, 255, 255, 0.6); }
+        @keyframes hintPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.45), 0 4px 20px rgba(0, 0, 0, 0.4); }
+            70%      { box-shadow: 0 0 0 12px rgba(0, 255, 255, 0), 0 4px 20px rgba(0, 0, 0, 0.4); }
+        }
+
+        /* 播放进度环 */
+        #music-btn .ring {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+            pointer-events: none;
+        }
+        #music-btn .ring-bg {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.12);
+            stroke-width: 2;
+        }
+        #music-btn .ring-fg {
+            fill: none;
+            stroke: #00ffff;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-dasharray: 157.08;
+            stroke-dashoffset: 157.08;
+            opacity: 0;
+            transition: stroke-dashoffset 0.25s linear, opacity 0.35s;
+            filter: drop-shadow(0 0 4px rgba(0, 255, 255, 0.7));
+        }
+        #music-btn.playing .ring-fg { opacity: 1; }
     </style>
 </head>
 <body>
@@ -201,12 +288,23 @@
             👋 对着摄像头：<br>
             • 捏合手指 = 凝聚粒子<br>
             • 张开手掌 = 扩散/爆炸<br>
+            🎵 左上角音符 = 播放 / 暂停音乐<br>
             <span style="color:#666">（摄像头不可用时，拖动上面的滑块控制）</span>
         </div>
     </div>
 
     <button id="fullscreen-btn" onclick="toggleFullScreen()">⛶</button>
     <video id="camera-preview" playsinline></video>
+
+    <!-- 左上角音乐按钮 -->
+    <div id="music-btn" role="button" tabindex="0" aria-label="播放/暂停背景音乐" title="播放/暂停音乐">
+        <svg class="ring" viewBox="0 0 56 56" aria-hidden="true">
+            <circle class="ring-bg" cx="28" cy="28" r="25"></circle>
+            <circle class="ring-fg" cx="28" cy="28" r="25"></circle>
+        </svg>
+        <span class="note">♪</span>
+    </div>
+    <audio id="bgm" src="music.mp3" loop preload="auto"></audio>
 
     <!-- 引入库文件 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -388,6 +486,58 @@
                 if (document.exitFullscreen) document.exitFullscreen();
             }
         }
+
+        // --- 4.5 背景音乐（左上角音符按钮） ---
+        const bgm = document.getElementById('bgm');
+        const musicBtn = document.getElementById('music-btn');
+        const ringFg = musicBtn.querySelector('.ring-fg');
+        const RING_CIRC = 2 * Math.PI * 25;
+
+        function syncMusicUI() {
+            const playing = !bgm.paused && !bgm.ended;
+            musicBtn.classList.toggle('playing', playing);
+            musicBtn.classList.remove('hint');   // 一旦有状态变化就撤掉提示
+            musicBtn.setAttribute('aria-label', playing ? '暂停音乐' : '播放音乐');
+            musicBtn.title = playing ? '暂停音乐' : '播放音乐';
+            if (!playing) ringFg.style.strokeDashoffset = String(RING_CIRC);
+        }
+
+        function playMusic() {
+            return bgm.play().then(() => {
+                syncMusicUI();
+                return true;
+            }).catch(() => {
+                // 被浏览器自动播放策略拦了：给按钮加呼吸提示，等用户点一下
+                musicBtn.classList.add('hint');
+                musicBtn.classList.remove('playing');
+                return false;
+            });
+        }
+
+        musicBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (bgm.paused || bgm.ended) playMusic();
+            else bgm.pause();
+        });
+        musicBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); musicBtn.click(); }
+        });
+
+        bgm.addEventListener('play', syncMusicUI);
+        bgm.addEventListener('pause', syncMusicUI);
+        bgm.addEventListener('loadedmetadata', () => {
+            ringFg.style.strokeDasharray = RING_CIRC;
+            ringFg.style.strokeDashoffset = RING_CIRC;
+        });
+        bgm.addEventListener('timeupdate', () => {
+            if (bgm.duration && !bgm.paused) {
+                const p = bgm.currentTime / bgm.duration;
+                ringFg.style.strokeDashoffset = String(RING_CIRC * (1 - p));
+            }
+        });
+
+        // 进页面就试着播，被拦了就走 hint 提示
+        playMusic();
 
         // --- 5. MediaPipe ---
         let camReady = false;
